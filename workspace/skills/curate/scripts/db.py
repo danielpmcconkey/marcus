@@ -34,13 +34,13 @@ connect = get_connection
 # ── Channel operations ──────────────────────────────────────────────
 
 def get_active_channels():
-    """Return all channels with tier 1 or 2 that are still subscribed."""
+    """Return all subscribed channels (tiers 0-3)."""
     with connect() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
-                SELECT channel_id, channel_name, tier, last_upload_at
+                SELECT channel_id, channel_name, tier, category, last_upload_at
                 FROM marcus.channel
-                WHERE subscribed = TRUE AND tier IN (1, 2)
+                WHERE subscribed = TRUE AND tier IN (0, 1, 2, 3)
                 ORDER BY tier, channel_name
             """)
             return cur.fetchall()
@@ -101,6 +101,7 @@ def mark_unsubscribed(active_channel_ids):
                 UPDATE marcus.channel
                 SET subscribed = FALSE, updated_at = now()
                 WHERE subscribed = TRUE
+                  AND tier != 0
                   AND channel_id != ALL(%s)
             """, (list(active_channel_ids),))
             count = cur.rowcount
@@ -121,8 +122,8 @@ def update_channel_last_upload(channel_id, last_upload_at):
 
 
 def set_channel_tier(channel_id, tier):
-    """Set a channel's tier (1, 2, or 3)."""
-    if tier not in (1, 2, 3):
+    """Set a channel's tier (0=news, 1=must-watch, 2=priority, 3=filler)."""
+    if tier not in (0, 1, 2, 3):
         raise ValueError(f"Invalid tier: {tier}")
     with connect() as conn:
         with conn.cursor() as cur:
@@ -186,7 +187,8 @@ def update_video_status(video_id, status, playlist_item_id=None):
             if status == "queued":
                 cur.execute("""
                     UPDATE marcus.video
-                    SET status = %s, playlist_item_id = %s, queued_at = now()
+                    SET status = %s, playlist_item_id = %s, queued_at = now(),
+                        last_queued_at = now(), times_queued = times_queued + 1
                     WHERE video_id = %s
                 """, (status, playlist_item_id, video_id))
             elif status == "expired":
@@ -204,23 +206,133 @@ def update_video_status(video_id, status, playlist_item_id=None):
         conn.commit()
 
 
-def expire_stale_videos(max_age_days=3):
-    """Expire videos older than max_age_days that are still 'queued' or 'presented'.
+def expire_stale_videos(max_age_days=90):
+    """Expire videos older than max_age_days (by published_at).
 
-    Returns list of expired video dicts (for digest reporting).
+    Marks non-terminal videos as expired, removing them from the candidate pool.
+    Returns list of expired video dicts.
     """
     with connect() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
                 UPDATE marcus.video
                 SET status = 'expired', expired_at = now()
-                WHERE status IN ('queued', 'presented')
-                  AND created_at < now() - interval '%s days'
+                WHERE status NOT IN ('watched', 'skipped', 'expired')
+                  AND published_at < now() - interval '%s days'
                 RETURNING video_id, channel_id, title, status
             """, (max_age_days,))
             expired = cur.fetchall()
         conn.commit()
     return expired
+
+
+# ── Programme build queries ─────────────────────────────────────────
+
+def get_news_candidates():
+    """Return tier 0 videos from the last 24 hours, <=5 min, for agent curation."""
+    with connect() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT v.video_id, v.channel_id, c.channel_name, c.category,
+                       v.title, v.description, v.published_at,
+                       v.duration_seconds, v.thumbnail_url
+                FROM marcus.video v
+                JOIN marcus.channel c ON v.channel_id = c.channel_id
+                WHERE c.tier = 0 AND c.subscribed = TRUE
+                  AND v.published_at > now() - interval '24 hours'
+                  AND v.status NOT IN ('watched', 'skipped', 'expired')
+                  AND COALESCE(v.duration_seconds, 0) <= 300
+                ORDER BY v.published_at DESC
+            """)
+            return cur.fetchall()
+
+
+def get_subscription_picks(target_seconds=18000, min_seconds=10800):
+    """Mechanically select subscription videos for the daily programme.
+
+    Fills from tier 1 (no duration cap), then tier 2 (<=25 min),
+    then tier 3 (<=25 min). Within each tier: newest first, deprioritise
+    recently queued. Stops at target_seconds. Returns ordered list.
+
+    target_seconds: 18000 = 5 hours (upper bound)
+    min_seconds: 10800 = 3 hours (lower bound, best-effort)
+    """
+    DEFAULT_DURATION = 600  # 10 min for videos with unknown duration
+    TIER_DURATION_CAP = {1: None, 2: 1500, 3: 1500}  # 25 min = 1500s
+
+    picks = []
+    running_total = 0
+
+    with connect() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            for tier in (1, 2, 3):
+                if running_total >= target_seconds:
+                    break
+
+                cap = TIER_DURATION_CAP[tier]
+                duration_filter = ""
+                if cap is not None:
+                    duration_filter = f"AND COALESCE(v.duration_seconds, {DEFAULT_DURATION}) <= {cap}"
+
+                cur.execute(f"""
+                    SELECT v.video_id, v.channel_id, c.channel_name, c.category,
+                           v.title, v.description, v.published_at,
+                           v.duration_seconds, v.thumbnail_url,
+                           c.tier, v.last_queued_at, v.times_queued
+                    FROM marcus.video v
+                    JOIN marcus.channel c ON v.channel_id = c.channel_id
+                    WHERE c.tier = %s AND c.subscribed = TRUE
+                      AND v.published_at > now() - interval '90 days'
+                      AND v.status NOT IN ('watched', 'skipped', 'expired')
+                      AND COALESCE(v.duration_seconds, 0) >= 60
+                      {duration_filter}
+                    ORDER BY v.published_at DESC,
+                             v.last_queued_at ASC NULLS FIRST
+                """, (tier,))
+
+                for row in cur:
+                    dur = row["duration_seconds"] or DEFAULT_DURATION
+                    if running_total + dur > target_seconds:
+                        continue  # skip this one, might fit a shorter video
+                    picks.append(dict(row))
+                    running_total += dur
+
+    return picks, running_total
+
+
+def reset_playlist_statuses():
+    """Reset all 'queued' videos back to 'new' for playlist rebuild.
+
+    Clears playlist_item_id. Called before each daily rebuild.
+    """
+    with connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE marcus.video
+                SET status = 'new', playlist_item_id = NULL
+                WHERE status = 'queued'
+            """)
+            count = cur.rowcount
+        conn.commit()
+    return count
+
+
+def add_news_channel(channel_id, channel_name, category=None):
+    """Add a tier 0 (news) channel. Not a YouTube subscription."""
+    with connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO marcus.channel
+                    (channel_id, channel_name, tier, subscribed, category)
+                VALUES (%s, %s, 0, TRUE, %s)
+                ON CONFLICT (channel_id) DO UPDATE SET
+                    channel_name = EXCLUDED.channel_name,
+                    tier = 0,
+                    subscribed = TRUE,
+                    category = EXCLUDED.category,
+                    updated_at = now()
+            """, (channel_id, channel_name, category))
+        conn.commit()
 
 
 # ── Run log ─────────────────────────────────────────────────────────

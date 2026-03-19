@@ -39,6 +39,7 @@ def _pass_insert(entry, content):
     subprocess.run(
         ["pass", "insert", "-m", "-f", entry],
         input=content, text=True, check=True,
+        stdout=subprocess.DEVNULL,
     )
 
 
