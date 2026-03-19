@@ -15,28 +15,45 @@ Usage as CLI:
 
 import json
 import os
+import subprocess
 import sys
+import tempfile
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
-CLIENT_SECRET_PATH = "/media/dan/fdrive/codeprojects/marcus/.client_secret.json"
-TOKEN_PATH = "/media/dan/fdrive/codeprojects/marcus/.youtube_token.json"
+PASS_CLIENT_SECRET = "openclaw/marcus/client-secret"
+PASS_YOUTUBE_TOKEN = "openclaw/marcus/youtube-token"
 SCOPES = ["https://www.googleapis.com/auth/youtube.force-ssl"]
 
 
+def _pass_show(entry):
+    """Read an entry from pass store."""
+    return subprocess.check_output(["pass", "show", entry], text=True)
+
+
+def _pass_insert(entry, content):
+    """Write content to pass store."""
+    subprocess.run(
+        ["pass", "insert", "-m", "-f", entry],
+        input=content, text=True, check=True,
+    )
+
+
 def _load_credentials():
-    """Load credentials from the token file, or return None."""
-    if not os.path.exists(TOKEN_PATH):
+    """Load credentials from pass store, or return None."""
+    try:
+        token_json = _pass_show(PASS_YOUTUBE_TOKEN)
+    except subprocess.CalledProcessError:
         return None
-    creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
+    creds = Credentials.from_authorized_user_info(json.loads(token_json), SCOPES)
     return creds
 
 
 def _save_credentials(creds):
-    """Save credentials to the token file with restricted permissions."""
+    """Save credentials to pass store."""
     data = {
         "token": creds.token,
         "refresh_token": creds.refresh_token,
@@ -45,19 +62,25 @@ def _save_credentials(creds):
         "client_secret": creds.client_secret,
         "scopes": list(creds.scopes) if creds.scopes else SCOPES,
     }
-    # Write with restricted permissions
-    fd = os.open(TOKEN_PATH, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w") as f:
-        json.dump(data, f, indent=2)
+    _pass_insert(PASS_YOUTUBE_TOKEN, json.dumps(data, indent=2))
 
 
 def _run_oauth_flow():
     """Run the browser-based OAuth consent flow."""
-    if not os.path.exists(CLIENT_SECRET_PATH):
-        print(f"ERROR: Client secret not found at {CLIENT_SECRET_PATH}", file=sys.stderr)
+    try:
+        client_json = _pass_show(PASS_CLIENT_SECRET)
+    except subprocess.CalledProcessError:
+        print(f"ERROR: Client secret not found in pass at {PASS_CLIENT_SECRET}", file=sys.stderr)
         sys.exit(1)
-    flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_PATH, SCOPES)
-    creds = flow.run_local_server(port=0)
+    # InstalledAppFlow needs a file path, so write to a temp file
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        f.write(client_json)
+        tmp_path = f.name
+    try:
+        flow = InstalledAppFlow.from_client_secrets_file(tmp_path, SCOPES)
+        creds = flow.run_local_server(port=0)
+    finally:
+        os.unlink(tmp_path)
     _save_credentials(creds)
     print("OAuth flow complete. Token saved.", file=sys.stderr)
     return creds
@@ -107,7 +130,7 @@ def main():
         "valid": creds.valid,
         "expired": creds.expired,
         "has_refresh_token": creds.refresh_token is not None,
-        "token_path": TOKEN_PATH,
+        "token_store": PASS_YOUTUBE_TOKEN,
     }
     print(json.dumps(status, indent=2))
 
