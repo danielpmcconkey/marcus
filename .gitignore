@@ -1,0 +1,9 @@
+# Secrets
+.pgpass
+.client_secret.json
+.youtube_token.json
+
+# Python
+.venv/
+__pycache__/
+*.pyc
