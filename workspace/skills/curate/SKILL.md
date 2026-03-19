@@ -28,7 +28,7 @@ Daily, you scan Dan's subscriptions via RSS for new uploads, evaluate them again
 Run the main orchestrator:
 
 ```
-python3 /media/dan/fdrive/marcus/workspace/skills/curate/scripts/run_daily.py
+python3 /media/dan/fdrive/codeprojects/marcus/workspace/skills/curate/scripts/run_daily.py
 ```
 
 This script:
@@ -50,7 +50,7 @@ After receiving the output, compose the digest with your curatorial commentary a
 Re-fetch Dan's subscription list from YouTube (use sparingly — weekly or on-demand):
 
 ```
-python3 /media/dan/fdrive/marcus/workspace/skills/curate/scripts/subscriptions.py
+python3 /media/dan/fdrive/codeprojects/marcus/workspace/skills/curate/scripts/subscriptions.py
 ```
 
 Detects new subscriptions (inserted at tier 2) and unsubscribes (marked inactive).
@@ -59,17 +59,17 @@ Detects new subscriptions (inserted at tier 2) and unsubscribes (marked inactive
 
 List current playlist contents:
 ```
-python3 /media/dan/fdrive/marcus/workspace/skills/curate/scripts/playlist.py --list
+python3 /media/dan/fdrive/codeprojects/marcus/workspace/skills/curate/scripts/playlist.py --list
 ```
 
 Add a video to the playlist:
 ```
-python3 /media/dan/fdrive/marcus/workspace/skills/curate/scripts/playlist.py --add VIDEO_ID
+python3 /media/dan/fdrive/codeprojects/marcus/workspace/skills/curate/scripts/playlist.py --add VIDEO_ID
 ```
 
 Remove a video from the playlist:
 ```
-python3 /media/dan/fdrive/marcus/workspace/skills/curate/scripts/playlist.py --remove PLAYLIST_ITEM_ID
+python3 /media/dan/fdrive/codeprojects/marcus/workspace/skills/curate/scripts/playlist.py --remove PLAYLIST_ITEM_ID
 ```
 
 ## Interactive Commands

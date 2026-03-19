@@ -22,8 +22,8 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
-CLIENT_SECRET_PATH = "/media/dan/fdrive/marcus/.client_secret.json"
-TOKEN_PATH = "/media/dan/fdrive/marcus/.youtube_token.json"
+CLIENT_SECRET_PATH = "/media/dan/fdrive/codeprojects/marcus/.client_secret.json"
+TOKEN_PATH = "/media/dan/fdrive/codeprojects/marcus/.youtube_token.json"
 SCOPES = ["https://www.googleapis.com/auth/youtube.force-ssl"]
 
 

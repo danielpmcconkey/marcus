@@ -114,10 +114,10 @@ Steps:
 4. **APIs & Services → Credentials** → **Create Credentials → OAuth client ID**
    - Application type: **Desktop app**
    - Name: `marcus-youtube`
-5. Download the JSON credentials file → save as `/media/dan/fdrive/marcus/.client_secret.json` (mode 0600)
+5. Download the JSON credentials file → save as `/media/dan/fdrive/codeprojects/marcus/.client_secret.json` (mode 0600)
 6. The first time the auth script runs, it will open a browser for OAuth consent.
    Dan authorizes with his YouTube/Google account. The refresh token is saved
-   to `/media/dan/fdrive/marcus/.youtube_token.json` (mode 0600).
+   to `/media/dan/fdrive/codeprojects/marcus/.youtube_token.json` (mode 0600).
 
 **OAuth scope required:** `https://www.googleapis.com/auth/youtube.force-ssl`
 (covers both read and write; SSL-only variant is the minimum-privilege option
@@ -160,16 +160,16 @@ stays in `householdbudget` for now — migration is a future task, not blocking.
 
 Store credentials:
 ```bash
-# /media/dan/fdrive/marcus/.pgpass (mode 0600)
+# /media/dan/fdrive/codeprojects/marcus/.pgpass (mode 0600)
 localhost:5432:openclaw:marcus:<password>
 ```
 
 ### 0.4 — Credential File Permissions
 
 ```bash
-chmod 600 /media/dan/fdrive/marcus/.client_secret.json
-chmod 600 /media/dan/fdrive/marcus/.youtube_token.json  # after first auth
-chmod 600 /media/dan/fdrive/marcus/.pgpass
+chmod 600 /media/dan/fdrive/codeprojects/marcus/.client_secret.json
+chmod 600 /media/dan/fdrive/codeprojects/marcus/.youtube_token.json  # after first auth
+chmod 600 /media/dan/fdrive/codeprojects/marcus/.pgpass
 ```
 
 ---
@@ -183,7 +183,7 @@ chmod 600 /media/dan/fdrive/marcus/.pgpass
 ### 1.1 — Workspace Scaffolding
 
 ```
-/media/dan/fdrive/marcus/
+/media/dan/fdrive/codeprojects/marcus/
   workspace/
     SOUL.md
     IDENTITY.md
@@ -263,8 +263,8 @@ CREATE TABLE marcus.run_log (
 ### 1.3 — Python Scripts
 
 **`auth.py`** — OAuth token management
-- Load client secret from `/media/dan/fdrive/marcus/.client_secret.json`
-- Load/refresh token from `/media/dan/fdrive/marcus/.youtube_token.json`
+- Load client secret from `/media/dan/fdrive/codeprojects/marcus/.client_secret.json`
+- Load/refresh token from `/media/dan/fdrive/codeprojects/marcus/.youtube_token.json`
 - On first run: launch browser-based OAuth flow, save refresh token
 - Expose `get_youtube_service()` that returns an authenticated API client
 - Uses `google-auth-oauthlib` and `google-api-python-client`
@@ -375,7 +375,7 @@ Interactive commands Marcus responds to:
 ```bash
 # Register agent
 openclaw agents add marcus \
-  --workspace /media/dan/fdrive/marcus/workspace \
+  --workspace /media/dan/fdrive/codeprojects/marcus/workspace \
   --model anthropic/claude-sonnet-4-6 \
   --non-interactive
 
@@ -388,10 +388,10 @@ Exec approvals (`~/.openclaw/exec-approvals.json`):
 {
   "marcus": {
     "allowlist": [
-      { "pattern": "/media/dan/fdrive/marcus/workspace/skills/curate/scripts/run_daily.py" },
-      { "pattern": "/media/dan/fdrive/marcus/workspace/skills/curate/scripts/subscriptions.py" },
-      { "pattern": "/media/dan/fdrive/marcus/workspace/skills/curate/scripts/playlist.py" },
-      { "pattern": "/media/dan/fdrive/marcus/workspace/skills/curate/scripts/auth.py" }
+      { "pattern": "/media/dan/fdrive/codeprojects/marcus/workspace/skills/curate/scripts/run_daily.py" },
+      { "pattern": "/media/dan/fdrive/codeprojects/marcus/workspace/skills/curate/scripts/subscriptions.py" },
+      { "pattern": "/media/dan/fdrive/codeprojects/marcus/workspace/skills/curate/scripts/playlist.py" },
+      { "pattern": "/media/dan/fdrive/codeprojects/marcus/workspace/skills/curate/scripts/auth.py" }
     ]
   }
 }
@@ -615,7 +615,7 @@ CREATE TABLE marcus.discovery_source (
 ## Directory Structure (Final)
 
 ```
-/media/dan/fdrive/marcus/
+/media/dan/fdrive/codeprojects/marcus/
   workspace/
     SOUL.md
     IDENTITY.md

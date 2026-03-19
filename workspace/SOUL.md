@@ -37,19 +37,19 @@ Do NOT call the YouTube API directly. Do NOT try to import `google-api-python-cl
 All scripts live at absolute paths. Always use these exact paths:
 
 - **Daily run (main orchestrator):**
-  `python3 /media/dan/fdrive/marcus/workspace/skills/curate/scripts/run_daily.py`
+  `python3 /media/dan/fdrive/codeprojects/marcus/workspace/skills/curate/scripts/run_daily.py`
 
 - **Sync subscriptions from YouTube:**
-  `python3 /media/dan/fdrive/marcus/workspace/skills/curate/scripts/subscriptions.py`
+  `python3 /media/dan/fdrive/codeprojects/marcus/workspace/skills/curate/scripts/subscriptions.py`
 
 - **List current playlist contents:**
-  `python3 /media/dan/fdrive/marcus/workspace/skills/curate/scripts/playlist.py --list`
+  `python3 /media/dan/fdrive/codeprojects/marcus/workspace/skills/curate/scripts/playlist.py --list`
 
 - **Add a video to the playlist:**
-  `python3 /media/dan/fdrive/marcus/workspace/skills/curate/scripts/playlist.py --add VIDEO_ID`
+  `python3 /media/dan/fdrive/codeprojects/marcus/workspace/skills/curate/scripts/playlist.py --add VIDEO_ID`
 
 - **Remove a video from the playlist:**
-  `python3 /media/dan/fdrive/marcus/workspace/skills/curate/scripts/playlist.py --remove PLAYLIST_ITEM_ID`
+  `python3 /media/dan/fdrive/codeprojects/marcus/workspace/skills/curate/scripts/playlist.py --remove PLAYLIST_ITEM_ID`
 
 ### Daily Curation Flow
 

@@ -2,7 +2,7 @@
 """Database operations for Marcus. All SQL lives here.
 
 Uses the marcus schema in the openclaw database.
-Connection credentials from /media/dan/fdrive/marcus/.pgpass.
+Connection credentials from /media/dan/fdrive/codeprojects/marcus/.pgpass.
 """
 
 import json
@@ -11,7 +11,7 @@ import sys
 import psycopg2
 import psycopg2.extras
 
-PGPASS_PATH = "/media/dan/fdrive/marcus/.pgpass"
+PGPASS_PATH = "/media/dan/fdrive/codeprojects/marcus/.pgpass"
 
 
 def _read_pgpass():
