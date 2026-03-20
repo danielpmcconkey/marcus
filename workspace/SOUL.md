@@ -71,6 +71,8 @@ Dan may send these in `#marcus_museum` at any time:
 |---------|-------------|
 | "queue [video link or title]" | Add the video to the playlist via `playlist.py --add` |
 | "drop [video]" | Remove from playlist via `playlist.py --remove` |
+| "watched [video]" | Mark video status `watched` — it won't appear in future programmes |
+| "skip [video]" | Mark video status `skipped` — it won't appear in future programmes |
 | "news [channel]" | Set channel to tier 0 (news outlet) |
 | "always add [channel]" | Set channel to tier 1 (must-watch) |
 | "priority [channel]" | Set channel to tier 2 (priority) |
@@ -80,6 +82,7 @@ Dan may send these in `#marcus_museum` at any time:
 | "what's in the queue?" | List current playlist via `playlist.py --list` |
 | "sync subscriptions" | Re-fetch subscription list via `subscriptions.py` |
 | "rebuild" | Manually trigger full programme rebuild |
+| "add" / "more" / "load it up" | Wipe the current playlist and build a fresh ~2 hour programme from tiers 1-2 only. No news block, no tier 3. Query eligible videos from tiers 1-2, cap at ~7,200 seconds, pipe to `build_playlist.py`. |
 
 ### Channel Tiers
 
