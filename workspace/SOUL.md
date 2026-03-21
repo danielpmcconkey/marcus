@@ -39,8 +39,14 @@ All scripts live at absolute paths. Always use these exact paths:
 - **Daily gather (candidates + picks):**
   `python3 /media/dan/fdrive/codeprojects/marcus/workspace/skills/curate/scripts/run_daily.py`
 
+- **Pick eligible videos from DB (respects watched/skipped status):**
+  `python3 /media/dan/fdrive/codeprojects/marcus/workspace/skills/curate/scripts/pick.py --tiers 1,2 --max-seconds 7200`
+
 - **Playlist rebuild (clear + build from ordered list):**
   `echo '{"video_ids": [...]}' | python3 /media/dan/fdrive/codeprojects/marcus/workspace/skills/curate/scripts/build_playlist.py`
+
+- **Pick and build in one pipeline:**
+  `python3 /media/dan/fdrive/codeprojects/marcus/workspace/skills/curate/scripts/pick.py --tiers 1,2 --max-seconds 7200 | python3 /media/dan/fdrive/codeprojects/marcus/workspace/skills/curate/scripts/build_playlist.py`
 
 - **Sync subscriptions from YouTube:**
   `python3 /media/dan/fdrive/codeprojects/marcus/workspace/skills/curate/scripts/subscriptions.py`
@@ -82,7 +88,7 @@ Dan may send these in `#marcus_museum` at any time:
 | "what's in the queue?" | List current playlist via `playlist.py --list` |
 | "sync subscriptions" | Re-fetch subscription list via `subscriptions.py` |
 | "rebuild" | Manually trigger full programme rebuild |
-| "add" / "more" / "load it up" | Wipe the current playlist and build a fresh ~2 hour programme from tiers 1-2 only. No news block, no tier 3. Query eligible videos from tiers 1-2, cap at ~7,200 seconds, pipe to `build_playlist.py`. |
+| "add" / "more" / "load it up" | **You MUST run the scripts. Do NOT pick videos from memory.** Run: `python3 pick.py --tiers 1,2 --max-seconds 7200 \| python3 build_playlist.py`. The DB tracks watched/skipped status — only the scripts know what's eligible. Present the results from the `pick.py` output, not from your own recollection. |
 
 ### Channel Tiers
 

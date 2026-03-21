@@ -190,6 +190,7 @@ def update_video_status(video_id, status, playlist_item_id=None):
                     SET status = %s, playlist_item_id = %s, queued_at = now(),
                         last_queued_at = now(), times_queued = times_queued + 1
                     WHERE video_id = %s
+                      AND status NOT IN ('watched', 'skipped')
                 """, (status, playlist_item_id, video_id))
             elif status == "expired":
                 cur.execute("""
@@ -247,7 +248,7 @@ def get_news_candidates():
             return cur.fetchall()
 
 
-def get_subscription_picks(target_seconds=18000, min_seconds=10800):
+def get_subscription_picks(target_seconds=18000, min_seconds=10800, tiers=None):
     """Mechanically select subscription videos for the daily programme.
 
     Fills from tier 1 (no duration cap), then tier 2 (<=25 min),
@@ -256,16 +257,20 @@ def get_subscription_picks(target_seconds=18000, min_seconds=10800):
 
     target_seconds: 18000 = 5 hours (upper bound)
     min_seconds: 10800 = 3 hours (lower bound, best-effort)
+    tiers: list of tier numbers to include (default: [1, 2, 3])
     """
     DEFAULT_DURATION = 600  # 10 min for videos with unknown duration
     TIER_DURATION_CAP = {1: None, 2: 1500, 3: 1500}  # 25 min = 1500s
+
+    if tiers is None:
+        tiers = [1, 2, 3]
 
     picks = []
     running_total = 0
 
     with connect() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            for tier in (1, 2, 3):
+            for tier in tiers:
                 if running_total >= target_seconds:
                     break
 
