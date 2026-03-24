@@ -111,6 +111,12 @@ def run(sync_subs=False):
     news_candidates = db.get_news_candidates()
     print(f"News candidates: {len(news_candidates)} videos from tier 0.", file=sys.stderr)
 
+    # ── Step 7.5: Gather Spanish learning picks ────────────────
+    spanish_picks, spanish_total_seconds = db.get_spanish_picks()
+    spanish_mins = spanish_total_seconds / 60
+    print(f"Spanish picks: {len(spanish_picks)} videos, "
+          f"{spanish_mins:.0f}min total.", file=sys.stderr)
+
     # ── Step 8: Gather subscription picks ────────────────────────
     sub_picks, sub_total_seconds = db.get_subscription_picks()
     sub_hours = sub_total_seconds / 3600
@@ -129,10 +135,12 @@ def run(sync_subs=False):
     # ── Step 10: Output ──────────────────────────────────────────
     # Serialise RealDictRow objects to plain dicts
     news_out = [dict(r) for r in news_candidates]
+    spanish_out = [dict(r) for r in spanish_picks]
     sub_out = [dict(r) for r in sub_picks]
 
     result = {
         "news_candidates": news_out,
+        "spanish_picks": spanish_out,
         "subscription_picks": sub_out,
         "stats": {
             "channels_checked": len(channels),
@@ -140,6 +148,8 @@ def run(sync_subs=False):
             "shorts_filtered": shorts_filtered,
             "expired": len(expired),
             "news_candidate_count": len(news_candidates),
+            "spanish_pick_count": len(spanish_picks),
+            "spanish_total_seconds": spanish_total_seconds,
             "subscription_pick_count": len(sub_picks),
             "subscription_total_seconds": sub_total_seconds,
         },

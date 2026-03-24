@@ -40,7 +40,7 @@ def get_active_channels():
             cur.execute("""
                 SELECT channel_id, channel_name, tier, category, last_upload_at
                 FROM marcus.channel
-                WHERE subscribed = TRUE AND tier IN (0, 1, 2, 3)
+                WHERE subscribed = TRUE AND tier IN (0, 1, 2, 3, 4)
                 ORDER BY tier, channel_name
             """)
             return cur.fetchall()
@@ -101,7 +101,7 @@ def mark_unsubscribed(active_channel_ids):
                 UPDATE marcus.channel
                 SET subscribed = FALSE, updated_at = now()
                 WHERE subscribed = TRUE
-                  AND tier != 0
+                  AND tier NOT IN (0, 4)
                   AND channel_id != ALL(%s)
             """, (list(active_channel_ids),))
             count = cur.rowcount
@@ -122,8 +122,8 @@ def update_channel_last_upload(channel_id, last_upload_at):
 
 
 def set_channel_tier(channel_id, tier):
-    """Set a channel's tier (0=news, 1=must-watch, 2=priority, 3=filler)."""
-    if tier not in (0, 1, 2, 3):
+    """Set a channel's tier (0=news, 1=must-watch, 2=priority, 3=filler, 4=spanish)."""
+    if tier not in (0, 1, 2, 3, 4):
         raise ValueError(f"Invalid tier: {tier}")
     with connect() as conn:
         with conn.cursor() as cur:
@@ -228,6 +228,49 @@ def expire_stale_videos(max_age_days=90):
 
 
 # ── Programme build queries ─────────────────────────────────────────
+
+def get_spanish_picks(target_seconds=2700, min_seconds=1800):
+    """Select tier 4 (Spanish learning) videos for the daily programme.
+
+    Fills a 30-45 minute block. Duration cap: 25 min per video.
+    Within tier: newest first, deprioritise recently queued.
+
+    target_seconds: 2700 = 45 min (upper bound)
+    min_seconds: 1800 = 30 min (lower bound, best-effort)
+    """
+    DEFAULT_DURATION = 600  # 10 min for videos with unknown duration
+    DURATION_CAP = 1500  # 25 min per video
+
+    picks = []
+    running_total = 0
+
+    with connect() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT v.video_id, v.channel_id, c.channel_name, c.category,
+                       v.title, v.description, v.published_at,
+                       v.duration_seconds, v.thumbnail_url,
+                       c.tier, v.last_queued_at, v.times_queued
+                FROM marcus.video v
+                JOIN marcus.channel c ON v.channel_id = c.channel_id
+                WHERE c.tier = 4 AND c.subscribed = TRUE
+                  AND v.published_at > now() - interval '90 days'
+                  AND v.status NOT IN ('watched', 'skipped', 'expired')
+                  AND COALESCE(v.duration_seconds, 0) >= 60
+                  AND COALESCE(v.duration_seconds, %s) <= %s
+                ORDER BY v.published_at DESC,
+                         v.last_queued_at ASC NULLS FIRST
+            """, (DEFAULT_DURATION, DURATION_CAP))
+
+            for row in cur:
+                dur = row["duration_seconds"] or DEFAULT_DURATION
+                if running_total + dur > target_seconds:
+                    continue
+                picks.append(dict(row))
+                running_total += dur
+
+    return picks, running_total
+
 
 def get_news_candidates():
     """Return tier 0 videos from the last 24 hours, <=5 min, for agent curation."""
@@ -389,29 +432,45 @@ def save_playlist_config(playlist_id):
 # ── CLI ─────────────────────────────────────────────────────────────
 
 def main():
-    """Quick connectivity check."""
-    try:
-        with connect() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT current_database(), current_user, version()")
-                row = cur.fetchone()
-                # Check if marcus schema tables exist
-                cur.execute("""
-                    SELECT table_name FROM information_schema.tables
-                    WHERE table_schema = 'marcus'
-                    ORDER BY table_name
-                """)
-                tables = [r[0] for r in cur.fetchall()]
-        result = {
-            "status": "connected",
-            "database": row[0],
-            "user": row[1],
-            "pg_version": row[2],
-            "marcus_tables": tables,
-        }
-    except Exception as e:
-        result = {"status": "error", "error": str(e)}
-    print(json.dumps(result, indent=2))
+    import argparse
+    parser = argparse.ArgumentParser(description="Marcus DB utilities")
+    parser.add_argument("--check", action="store_true",
+                        help="Quick connectivity check")
+    parser.add_argument("--set-status", nargs=2, metavar=("VIDEO_ID", "STATUS"),
+                        help="Set a video's status (e.g. watched, skipped)")
+    args = parser.parse_args()
+
+    if args.set_status:
+        video_id, status = args.set_status
+        valid = ("new", "queued", "watched", "skipped", "expired")
+        if status not in valid:
+            print(json.dumps({"error": f"Invalid status '{status}'. Must be one of: {', '.join(valid)}"}))
+            sys.exit(1)
+        update_video_status(video_id, status)
+        print(json.dumps({"action": "set_status", "video_id": video_id, "status": status}))
+    else:
+        # Default: connectivity check (same as --check)
+        try:
+            with connect() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT current_database(), current_user, version()")
+                    row = cur.fetchone()
+                    cur.execute("""
+                        SELECT table_name FROM information_schema.tables
+                        WHERE table_schema = 'marcus'
+                        ORDER BY table_name
+                    """)
+                    tables = [r[0] for r in cur.fetchall()]
+            result = {
+                "status": "connected",
+                "database": row[0],
+                "user": row[1],
+                "pg_version": row[2],
+                "marcus_tables": tables,
+            }
+        except Exception as e:
+            result = {"status": "error", "error": str(e)}
+        print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":

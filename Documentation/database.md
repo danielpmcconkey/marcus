@@ -14,7 +14,7 @@ Tracks YouTube channels — both subscriptions and manually added news outlets.
 |--------|------|---------|-------------|
 | `channel_id` | TEXT PK | | YouTube channel ID (`UC...`) |
 | `channel_name` | TEXT NOT NULL | | Display name |
-| `tier` | SMALLINT NOT NULL | 2 | 0=news, 1=must-watch, 2=priority, 3=filler |
+| `tier` | SMALLINT NOT NULL | 2 | 0=news, 1=must-watch, 2=priority, 3=filler, 4=spanish |
 | `subscribed` | BOOLEAN NOT NULL | TRUE | FALSE = soft-deleted / unsubscribed |
 | `category` | TEXT | NULL | Free-form category (e.g., "technology", "politics") |
 | `last_upload_at` | TIMESTAMPTZ | NULL | Most recent video seen from this channel |
@@ -23,14 +23,17 @@ Tracks YouTube channels — both subscriptions and manually added news outlets.
 
 **Tier semantics:**
 
-| Tier | Role | Duration cap | Selection window | Source |
-|------|------|-------------|-----------------|--------|
-| 0 | News | 5 min/video | 24 hours | Manually added |
-| 1 | Must-watch | None | 3 months | YouTube subscription |
-| 2 | Priority | 25 min/video | 3 months | YouTube subscription (default for new subs) |
-| 3 | Filler | 25 min/video | 3 months | YouTube subscription |
+| Tier | Role | Duration cap | Selection window | Block budget | Source |
+|------|------|-------------|-----------------|-------------|--------|
+| 0 | News | 5 min/video | 24 hours | 20-30 min | Manually added |
+| 4 | Spanish | 25 min/video | 3 months | 30-45 min | YouTube subscription |
+| 1 | Must-watch | None | 3 months | 3-5 hours (shared) | YouTube subscription |
+| 2 | Priority | 25 min/video | 3 months | 3-5 hours (shared) | YouTube subscription (default for new subs) |
+| 3 | Filler | 25 min/video | 3 months | 3-5 hours (shared) | YouTube subscription |
 
-Tier 0 channels are NOT YouTube subscriptions. They are news outlets added directly via `db.add_news_channel()`. The subscription sync (`subscriptions.py`) will never mark them as unsubscribed — the `mark_unsubscribed()` query explicitly excludes `tier != 0`.
+Playlist order: News → Spanish → Must-watch → Priority → Filler.
+
+Tier 0 channels are NOT YouTube subscriptions. They are news outlets added directly via `db.add_news_channel()`. Tier 4 channels ARE YouTube subscriptions but are excluded from the subscription sync to prevent tier reassignment. The `mark_unsubscribed()` query explicitly excludes tiers 0 and 4.
 
 ### `marcus.video`
 

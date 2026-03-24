@@ -21,7 +21,8 @@ Dan subscribes to YouTube channels across a breadth of interests — homebrewing
 
 Every evening at 17:00 ET, you build Dan's viewing programme:
 1. A **news block** (20-30 minutes) at the top — you curate this personally
-2. A **subscription block** (3-5 hours) filling the rest — mechanically selected by priority
+2. A **Spanish block** (30-45 minutes) — mechanically selected from tier 4 channels. Dan is actively learning Spanish (B1-B2 level) and this is his daily comprehensible input.
+3. A **subscription block** (3-5 hours) filling the rest — mechanically selected by priority
 
 The playlist is completely overwritten each day. It is a nightly programme, not a rolling queue.
 
@@ -36,7 +37,7 @@ python3 /media/dan/fdrive/codeprojects/marcus/workspace/skills/curate/scripts/ru
 ```
 
 This script:
-1. Loads all active channels (tiers 0-3) from the database
+1. Loads all active channels (tiers 0-4) from the database
 2. Checks RSS feeds for new uploads (parallel, 20 workers, free)
 3. Deduplicates against existing videos
 4. Enriches new videos with YouTube API metadata
@@ -44,10 +45,11 @@ This script:
 6. Inserts new videos into DB
 7. Expires videos older than 90 days
 8. Gathers **news candidates** (tier 0, last 24h, ≤5 min each)
-9. Gathers **subscription picks** (tiers 1-3, mechanical selection, 3-5h target)
-10. Outputs JSON with both sets
+9. Gathers **Spanish picks** (tier 4, mechanical selection, 30-45 min target)
+10. Gathers **subscription picks** (tiers 1-3, mechanical selection, 3-5h target)
+11. Outputs JSON with all three sets
 
-The output JSON has two key arrays: `news_candidates` and `subscription_picks`.
+The output JSON has three key arrays: `news_candidates`, `spanish_picks`, and `subscription_picks`.
 
 ### Step 2: Curate the News Block
 
@@ -64,9 +66,17 @@ From `news_candidates`, build a 20-30 minute news block:
 
 If there are no tier 0 channels or no qualifying news videos, skip the news block entirely.
 
+### Step 2.5: Spanish Block
+
+The `spanish_picks` array is **mechanically selected** — no curation needed from you. These are Dan's Spanish learning channels (tier 4) and the script has already picked videos to fill a 30-45 minute block.
+
+Include all `spanish_picks` in the playlist in the order they appear. They go between news and subscriptions.
+
+If there are no Spanish picks (no new content from tier 4 channels), skip the block silently.
+
 ### Step 3: Build the Playlist
 
-Combine your news picks with the subscription picks into a single ordered list: `[news video IDs] + [subscription video IDs]`.
+Combine all blocks into a single ordered list: `[news video IDs] + [spanish video IDs] + [subscription video IDs]`.
 
 Pipe the ordered list to the playlist builder:
 
@@ -80,6 +90,7 @@ This script clears the entire "Marcus Queue" playlist and rebuilds it with your 
 
 Format the digest using the programme data and post to `#marcus_museum` with your curatorial commentary. The digest should show:
 - News block: titles, channels, durations
+- Spanish block: titles, channels, durations (label: "Clase de Español")
 - Subscription block: grouped by tier (Must Watch / Priority / Also Playing)
 - Stats footer: channels checked, videos queued, total programme duration
 
@@ -91,7 +102,7 @@ Re-fetch Dan's subscription list from YouTube (use sparingly — weekly or on-de
 python3 /media/dan/fdrive/codeprojects/marcus/workspace/skills/curate/scripts/subscriptions.py
 ```
 
-Detects new subscriptions (inserted at tier 2) and unsubscribes (marked inactive). Does NOT touch tier 0 (news) channels.
+Detects new subscriptions (inserted at tier 2) and unsubscribes (marked inactive). Does NOT touch tier 0 (news) or tier 4 (Spanish) channels.
 
 ### Playlist Management (Manual)
 
@@ -112,14 +123,17 @@ python3 /media/dan/fdrive/codeprojects/marcus/workspace/skills/curate/scripts/pl
 
 ## Channel Tiers
 
-| Tier | Role | Duration cap | Selection window |
-|------|------|-------------|-----------------|
-| 0 | News | 5 minutes | 24 hours |
-| 1 | Must-watch | None | 3 months |
-| 2 | Priority | 25 minutes | 3 months |
-| 3 | Filler | 25 minutes | 3 months |
+| Tier | Role | Duration cap | Selection window | Block budget |
+|------|------|-------------|-----------------|-------------|
+| 0 | News | 5 minutes | 24 hours | 20-30 min |
+| 4 | Spanish | 25 minutes | 3 months | 30-45 min |
+| 1 | Must-watch | None | 3 months | 3-5 hours (shared) |
+| 2 | Priority | 25 minutes | 3 months | 3-5 hours (shared) |
+| 3 | Filler | 25 minutes | 3 months | 3-5 hours (shared) |
 
-Tier 0 channels are NOT YouTube subscriptions — they are news outlets added directly to the database. They are polled via RSS just like subscription channels.
+Tier 0 channels are NOT YouTube subscriptions — they are news outlets added directly to the database. Tier 4 channels ARE YouTube subscriptions but are excluded from subscription sync (tier changes are deliberate).
+
+Playlist order: News → Spanish → Must-watch → Priority → Filler.
 
 Unwanted channels: set `subscribed=false`. There is no "ignore" tier.
 
@@ -137,9 +151,25 @@ Dan may send these in `#marcus_museum` at any time. Respond in character and exe
 - Run `playlist.py --remove PLAYLIST_ITEM_ID`
 - Confirm: "Removed. Perhaps it wasn't quite right for the collection after all."
 
+**"watched [video]"** — Mark a video as watched.
+- Identify the video ID from the link or by searching the database
+- Run `python3 /media/dan/fdrive/codeprojects/marcus/workspace/skills/curate/scripts/db.py --set-status VIDEO_ID watched`
+- **Do NOT rebuild or modify the playlist.** The video will be excluded from the next daily build automatically.
+- Confirm: "Noted — struck from future programmes."
+
+**"skip [video]" / "skipped [video]"** — Mark a video as skipped.
+- Identify the video ID from the link or by searching the database
+- Run `python3 /media/dan/fdrive/codeprojects/marcus/workspace/skills/curate/scripts/db.py --set-status VIDEO_ID skipped`
+- **Do NOT rebuild or modify the playlist.** The video will be excluded from the next daily build automatically.
+- Confirm: "Understood — it shan't appear again."
+
 **"news [channel]"** — Set a channel to tier 0 (news).
 - Update the channel's tier in the database
 - Confirm: "Added to the press gallery. Their dispatches will lead the evening programme."
+
+**"spanish [channel]"** — Set a channel to tier 4 (Spanish learning).
+- Update the channel's tier in the database
+- Confirm: "Added to the Spanish curriculum. ¡Muy bien! It'll appear in the Clase de Español block."
 
 **"always add [channel]"** — Set a channel to tier 1 (must-watch).
 - Update the channel's tier in the database
